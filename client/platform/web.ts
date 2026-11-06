@@ -6,7 +6,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Platform } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+} from "react-native";
+import { createElement } from "react";
 import { createPortal } from "./generated/react-dom-portal.js";
 
 interface KeyEvent {
@@ -238,9 +244,8 @@ export function WebDialogPortal({
         : initialFocusTarget(container);
     target.focus();
   });
-  return Platform.OS === "web" && container
-    ? createPortal(children, container)
-    : null;
+  if (Platform.OS !== "web") return NativeLayer({ children, dismiss });
+  return container ? createPortal(children, container) : null;
 }
 
 /** Non-modal surface: no backdrop and no focus trap; host overlays stay above it. */
@@ -310,9 +315,8 @@ export function WebMenuPortal({
   useEffect(() => {
     if (container) focusable(container)[0]?.focus();
   }, [container]);
-  return Platform.OS === "web" && container
-    ? createPortal(children, container)
-    : null;
+  if (Platform.OS !== "web") return NativeLayer({ children, dismiss });
+  return container ? createPortal(children, container) : null;
 }
 
 /** Dropdown select popover portal: elevated above dialogs (z=100) and unconstrained by ScrollView overflow. */
@@ -365,8 +369,38 @@ export function WebSelectPortal({
     };
   }, []);
 
-  if (Platform.OS === "web" && container) {
-    return createPortal(children, container);
-  }
+  if (Platform.OS !== "web") return NativeLayer({ children, dismiss });
+  if (container) return createPortal(children, container);
   return children;
+}
+
+const nativeLayerStyles = StyleSheet.create({ fill: { flex: 1 } });
+
+/** iOS/Android have no DOM: overlays render in a transparent native Modal. */
+function NativeLayer({
+  children,
+  dismiss,
+}: {
+  children: ReactNode;
+  dismiss: { current: () => void };
+}) {
+  return createElement(
+    Modal,
+    {
+      transparent: true,
+      visible: true,
+      animationType: "fade",
+      statusBarTranslucent: true,
+      supportedOrientations: ["portrait", "landscape"],
+      onRequestClose: () => dismiss.current(),
+    },
+    createElement(
+      KeyboardAvoidingView,
+      {
+        style: nativeLayerStyles.fill,
+        behavior: Platform.OS === "ios" ? "padding" : undefined,
+      },
+      children,
+    ),
+  );
 }

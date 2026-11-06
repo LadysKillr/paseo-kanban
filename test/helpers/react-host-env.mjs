@@ -81,6 +81,9 @@ export const mockReactNative = {
   Pressable: "Pressable",
   ScrollView: "ScrollView",
   ActivityIndicator: "ActivityIndicator",
+  Modal: "Modal",
+  KeyboardAvoidingView: "KeyboardAvoidingView",
+  Dimensions: { get: () => ({ width: 390, height: 844 }) },
   StyleSheet: {
     create: (styles) => styles,
     flatten: (styles) =>

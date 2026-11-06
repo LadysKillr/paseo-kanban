@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  Dimensions,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -138,7 +139,21 @@ export function Select({
   }, [options, isSearchable, searchQuery]);
 
   const updateTriggerRect = () => {
-    if (Platform.OS !== "web" || typeof window === "undefined") {
+    if (Platform.OS !== "web") {
+      triggerRef.current?.measureInWindow?.((x, y, width, height) => {
+        if (width > 0 || height > 0)
+          setTriggerRect({
+            top: y,
+            bottom: y + height,
+            left: x,
+            right: x + width,
+            width,
+            height,
+          });
+      });
+      return;
+    }
+    if (typeof window === "undefined") {
       return;
     }
     const el = findDOMNode(triggerRef.current);
@@ -177,10 +192,11 @@ export function Select({
   const shouldAlignLeft = align === "left" || (!align && !showLabel);
 
   const popoverPositionStyle = useMemo<ViewStyle>(() => {
+    const nativeViewport =
+      Platform.OS !== "web" ? Dimensions.get("window") : null;
     if (
       !triggerRect ||
-      Platform.OS !== "web" ||
-      typeof window === "undefined"
+      (Platform.OS === "web" && typeof window === "undefined")
     ) {
       return {
         position: "absolute",
@@ -191,8 +207,9 @@ export function Select({
       };
     }
 
-    const viewportHeight = window.innerHeight || 800;
-    const viewportWidth = window.innerWidth || 1200;
+    const viewportHeight =
+      nativeViewport?.height ?? (window.innerHeight || 800);
+    const viewportWidth = nativeViewport?.width ?? (window.innerWidth || 1200);
     const popoverMaxHeight = 220;
 
     const spaceBelow = viewportHeight - triggerRect.bottom;
@@ -212,7 +229,9 @@ export function Select({
     );
 
     return {
-      position: "fixed" as unknown as "absolute",
+      position: (Platform.OS === "web"
+        ? "fixed"
+        : "absolute") as unknown as "absolute",
       top,
       left,
       width: align === "fill" ? triggerRect.width : undefined,
@@ -302,7 +321,7 @@ export function Select({
           />
         </Pressable>
 
-        {isOpen && (
+        {isOpen && (Platform.OS === "web" || triggerRect) && (
           <WebSelectPortal onDismiss={() => setIsOpen(false)}>
             <Pressable
               style={styles.backdrop}
@@ -464,7 +483,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backdrop: {
-    position: "fixed" as unknown as "absolute",
+    position: (Platform.OS === "web"
+      ? "fixed"
+      : "absolute") as unknown as "absolute",
     top: 0,
     left: 0,
     right: 0,

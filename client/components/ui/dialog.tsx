@@ -87,10 +87,10 @@ export function Dialog({
             {
               maxWidth,
               width: viewportWidth
-                ? (`${viewportWidth}vw` as DimensionValue)
+                ? (`${viewportWidth}${Platform.OS === "web" ? "vw" : "%"}` as DimensionValue)
                 : "100%",
               height: viewportHeight
-                ? (`${viewportHeight}vh` as DimensionValue)
+                ? (`${viewportHeight}${Platform.OS === "web" ? "vh" : "%"}` as DimensionValue)
                 : undefined,
               backgroundColor: colors.surface1,
               borderColor: colors.border,
