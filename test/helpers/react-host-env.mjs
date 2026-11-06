@@ -84,6 +84,7 @@ export const mockReactNative = {
   Modal: "Modal",
   Keyboard: { addListener: () => ({ remove() {} }) },
   Dimensions: { get: () => ({ width: 390, height: 844 }) },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
   StyleSheet: {
     create: (styles) => styles,
     flatten: (styles) =>

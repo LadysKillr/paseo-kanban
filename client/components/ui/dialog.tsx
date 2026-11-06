@@ -6,6 +6,7 @@ import {
   View,
   ScrollView,
   Platform,
+  useWindowDimensions,
   type DimensionValue,
   type StyleProp,
   type ViewStyle,
@@ -38,6 +39,9 @@ export interface DialogProps {
   closeLabel?: string;
 }
 
+/** Clears the status bar and Dynamic Island on phones. */
+const NATIVE_TOP_INSET = 60;
+
 export function Dialog({
   title,
   icon,
@@ -63,12 +67,33 @@ export function Dialog({
 
   const keyboardInset = useNativeKeyboardInset();
   const native = Platform.OS !== "web";
-  // Native Yoga collapses flex:1 bodies inside an auto-height card to zero, so
-  // contained dialogs get a definite height on iOS/Android.
-  // Desktop vh sizes are too short on a phone; use one tall sheet size, which
-  // also keeps the card clear of the status bar / Dynamic Island.
+  const screen = useWindowDimensions();
+  // On iOS/Android the Modal root can be resized by the host around keyboard
+  // events and not restored, so the overlay is sized from the screen itself.
+  // Native Yoga also collapses flex:1 bodies inside an auto-height card to
+  // zero, so contained dialogs get a definite pixel height that stays clear of
+  // the status bar / Dynamic Island and of the keyboard.
+  const nativeOverlay: ViewStyle | undefined = native
+    ? {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: screen.width,
+        height: screen.height,
+        paddingTop: NATIVE_TOP_INSET,
+        paddingBottom: 24 + keyboardInset,
+      }
+    : undefined;
   const nativeHeight =
-    native && (viewportHeight || scroll === "contained") ? "80%" : undefined;
+    native && (viewportHeight || scroll === "contained")
+      ? Math.max(
+          160,
+          Math.min(
+            screen.height * 0.8,
+            screen.height - keyboardInset - NATIVE_TOP_INSET - 24 - 16,
+          ),
+        )
+      : undefined;
 
   const changeOpen = (next: boolean) => {
     if (next || canClose()) onOpenChange(next);
@@ -81,12 +106,7 @@ export function Dialog({
 
   return (
     <WebDialogPortal onDismiss={() => changeOpen(false)}>
-      <View
-        style={[
-          styles.overlay,
-          keyboardInset > 0 && { paddingBottom: 24 + keyboardInset },
-        ]}
-      >
+      <View style={[styles.overlay, nativeOverlay]}>
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={() => changeOpen(false)}

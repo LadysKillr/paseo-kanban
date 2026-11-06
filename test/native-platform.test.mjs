@@ -56,7 +56,7 @@ test("原生平台：Dialog 通过原生 Modal 显示、不用 vw/vh，并响应
   );
   const style = Object.assign({}, ...[card.props.style].flat(Infinity));
   assert.equal(style.width, "90%");
-  assert.equal(style.height, "80%", "contained dialogs get a definite height");
+  assert.equal(style.height, 844 * 0.8, "definite height from the screen");
   await act(async () => modals[0].props.onRequestClose());
   assert.equal(closed, 1);
 });
@@ -78,7 +78,13 @@ test("原生平台：contained 弹窗即使未指定高度也获得确定高度�
     .findByType("Modal")
     .find((node) => node.type === "View" && node.props.role === "dialog");
   const style = Object.assign({}, ...[card.props.style].flat(Infinity));
-  assert.equal(style.height, "80%");
+  assert.equal(style.height, 844 * 0.8);
+  const overlay = Object.assign(
+    {},
+    ...[card.parent.props.style].flat(Infinity),
+  );
+  assert.equal(overlay.height, 844, "backdrop covers the whole screen");
+  assert.equal(overlay.top, 0);
 });
 
 test("原生平台：Select 弹出层在原生 Modal 中按触发器位置显示并可选择", async (t) => {
@@ -126,4 +132,43 @@ test("原生平台：Select 弹出层在原生 Modal 中按触发器位置显示
   await act(async () => beta.props.onPress());
   assert.equal(picked, "b");
   assert.equal(renderer.root.findAllByType("Modal").length, 0);
+});
+
+test("原生平台：键盘弹出时弹窗缩短并停留在键盘上方，收起后恢复", async (t) => {
+  asIOS(t);
+  const listeners = new Map();
+  t.mock.method(mockReactNative.Keyboard, "addListener", (event, cb) => {
+    listeners.set(event, cb);
+    return { remove: () => listeners.delete(event) };
+  });
+  const Dialog = loadClientComponent("components/ui/dialog", "Dialog");
+  let renderer;
+  await act(async () => {
+    renderer = TestRenderer.create(
+      React.createElement(
+        Dialog,
+        { title: "Edit", theme, scroll: "contained", onOpenChange() {} },
+        React.createElement("Text", null, "body"),
+      ),
+    );
+  });
+  const measure = () => {
+    const card = renderer.root
+      .findByType("Modal")
+      .find((node) => node.type === "View" && node.props.role === "dialog");
+    const flat = (node) =>
+      Object.assign({}, ...[node.props.style].flat(Infinity));
+    return { card: flat(card), overlay: flat(card.parent) };
+  };
+  await act(async () =>
+    listeners.get("keyboardWillShow")({ endCoordinates: { height: 300 } }),
+  );
+  let { card, overlay } = measure();
+  assert.equal(overlay.height, 844, "backdrop still covers the screen");
+  assert.equal(overlay.paddingBottom, 324);
+  assert.equal(card.height, 844 - 300 - 60 - 24 - 16);
+  await act(async () => listeners.get("keyboardWillHide")());
+  ({ card, overlay } = measure());
+  assert.equal(overlay.paddingBottom, 24);
+  assert.equal(card.height, 844 * 0.8);
 });
