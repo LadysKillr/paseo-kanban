@@ -56,9 +56,29 @@ test("原生平台：Dialog 通过原生 Modal 显示、不用 vw/vh，并响应
   );
   const style = Object.assign({}, ...[card.props.style].flat(Infinity));
   assert.equal(style.width, "90%");
-  assert.equal(style.height, "80%");
+  assert.equal(style.height, "80%", "contained dialogs get a definite height");
   await act(async () => modals[0].props.onRequestClose());
   assert.equal(closed, 1);
+});
+
+test("原生平台：contained 弹窗即使未指定高度也获得确定高度，避免内容塌缩为 0", async (t) => {
+  asIOS(t);
+  const Dialog = loadClientComponent("components/ui/dialog", "Dialog");
+  let renderer;
+  await act(async () => {
+    renderer = TestRenderer.create(
+      React.createElement(
+        Dialog,
+        { title: "Create", theme, scroll: "contained", onOpenChange() {} },
+        React.createElement("Text", null, "body"),
+      ),
+    );
+  });
+  const card = renderer.root
+    .findByType("Modal")
+    .find((node) => node.type === "View" && node.props.role === "dialog");
+  const style = Object.assign({}, ...[card.props.style].flat(Infinity));
+  assert.equal(style.height, "80%");
 });
 
 test("原生平台：Select 弹出层在原生 Modal 中按触发器位置显示并可选择", async (t) => {

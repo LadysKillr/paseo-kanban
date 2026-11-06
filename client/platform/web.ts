@@ -6,12 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-} from "react-native";
+import { Keyboard, Modal, Platform, StyleSheet, View } from "react-native";
 import { createElement } from "react";
 import { createPortal } from "./generated/react-dom-portal.js";
 
@@ -394,13 +389,28 @@ function NativeLayer({
       supportedOrientations: ["portrait", "landscape"],
       onRequestClose: () => dismiss.current(),
     },
-    createElement(
-      KeyboardAvoidingView,
-      {
-        style: nativeLayerStyles.fill,
-        behavior: Platform.OS === "ios" ? "padding" : undefined,
-      },
-      children,
-    ),
+    createElement(View, { style: nativeLayerStyles.fill }, children),
   );
+}
+
+/** Height of the on-screen keyboard on iOS/Android (0 on web or when hidden). */
+export function useNativeKeyboardInset(): number {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    if (Platform.OS === "web" || !Keyboard?.addListener) return;
+    const ios = Platform.OS === "ios";
+    const show = Keyboard.addListener(
+      ios ? "keyboardWillShow" : "keyboardDidShow",
+      (event) => setInset(event.endCoordinates?.height ?? 0),
+    );
+    const hide = Keyboard.addListener(
+      ios ? "keyboardWillHide" : "keyboardDidHide",
+      () => setInset(0),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return inset;
 }

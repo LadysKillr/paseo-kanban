@@ -82,7 +82,7 @@ export const mockReactNative = {
   ScrollView: "ScrollView",
   ActivityIndicator: "ActivityIndicator",
   Modal: "Modal",
-  KeyboardAvoidingView: "KeyboardAvoidingView",
+  Keyboard: { addListener: () => ({ remove() {} }) },
   Dimensions: { get: () => ({ width: 390, height: 844 }) },
   StyleSheet: {
     create: (styles) => styles,

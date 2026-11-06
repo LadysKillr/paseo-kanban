@@ -12,7 +12,11 @@ import {
 } from "react-native";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
-import { WebDialogPortal, useDialogInputFocus } from "../../platform/web";
+import {
+  WebDialogPortal,
+  useDialogInputFocus,
+  useNativeKeyboardInset,
+} from "../../platform/web";
 import { useI18n } from "../../platform/i18n";
 
 export interface DialogProps {
@@ -57,6 +61,15 @@ export function Dialog({
     open && inputFocus ? colors.accent : undefined,
   );
 
+  const keyboardInset = useNativeKeyboardInset();
+  const native = Platform.OS !== "web";
+  // Native Yoga collapses flex:1 bodies inside an auto-height card to zero, so
+  // contained dialogs get a definite height on iOS/Android.
+  // Desktop vh sizes are too short on a phone; use one tall sheet size, which
+  // also keeps the card clear of the status bar / Dynamic Island.
+  const nativeHeight =
+    native && (viewportHeight || scroll === "contained") ? "80%" : undefined;
+
   const changeOpen = (next: boolean) => {
     if (next || canClose()) onOpenChange(next);
   };
@@ -68,7 +81,12 @@ export function Dialog({
 
   return (
     <WebDialogPortal onDismiss={() => changeOpen(false)}>
-      <View style={styles.overlay}>
+      <View
+        style={[
+          styles.overlay,
+          keyboardInset > 0 && { paddingBottom: 24 + keyboardInset },
+        ]}
+      >
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={() => changeOpen(false)}
@@ -89,9 +107,11 @@ export function Dialog({
               width: viewportWidth
                 ? (`${viewportWidth}${Platform.OS === "web" ? "vw" : "%"}` as DimensionValue)
                 : "100%",
-              height: viewportHeight
-                ? (`${viewportHeight}${Platform.OS === "web" ? "vh" : "%"}` as DimensionValue)
-                : undefined,
+              height: native
+                ? (nativeHeight as DimensionValue | undefined)
+                : viewportHeight
+                  ? (`${viewportHeight}vh` as DimensionValue)
+                  : undefined,
               backgroundColor: colors.surface1,
               borderColor: colors.border,
             },
@@ -133,6 +153,7 @@ export function Dialog({
               ]}
             >
               <ScrollView
+                style={native ? styles.nativeScroll : undefined}
                 keyboardShouldPersistTaps="handled"
                 contentContainerStyle={bodyStyle}
               >
@@ -192,6 +213,9 @@ const styles = StyleSheet.create({
   close: {
     padding: 4,
     borderRadius: 4,
+  },
+  nativeScroll: {
+    flexGrow: 0,
   },
   scrollSurface: {
     flexShrink: 1,
