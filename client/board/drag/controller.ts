@@ -140,6 +140,8 @@ export interface CardDragBinding {
 export interface LaneDragBinding {
   readonly draggedCardHeight?: number;
   readonly isHovered: boolean;
+  /** True while any card is lifted; scroll containers must stop scrolling. */
+  readonly isDragActive: boolean;
   readonly targetIndex: number;
   readonly isTaskDragging: (taskId: string) => boolean;
   readonly isDragLocked: () => boolean;
@@ -147,6 +149,7 @@ export interface LaneDragBinding {
     taskId: string,
     onSelectTask?: () => void,
     factory?: PanResponderFactory,
+    onLongPress?: (point: { x: number; y: number }) => void,
   ) => CardDragBinding;
   readonly registerLaneLayout: (layout: Rect) => void;
   readonly registerCardsViewport: (layout: Rect) => void;
@@ -163,6 +166,8 @@ interface ActiveDragSession {
   lastPointerX: number;
   lastPointerY: number;
   isActivated: boolean;
+  /** Farthest the pointer travelled from the start point during the gesture. */
+  maxDistance?: number;
   currentTargetIndex?: number;
   draggedCardWidth?: number;
   draggedCardHeight?: number;
@@ -195,6 +200,8 @@ export class KanbanDragController {
   private dragLockTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingOnPress: (() => void) | null = null;
+  private pendingOnLongPress:
+    ((point: { x: number; y: number }) => void) | null = null;
   private listeners: Set<() => void> = new Set();
   private slotListeners: Set<() => void> = new Set();
   private dropListeners: Set<() => void> = new Set();
@@ -206,6 +213,10 @@ export class KanbanDragController {
   private cancelHandler?: () => void;
   private panResponderFactory: PanResponderFactory | null = null;
   private cardCallbacks: Map<string, () => void> = new Map();
+  private cardLongPressCallbacks: Map<
+    string,
+    (point: { x: number; y: number }) => void
+  > = new Map();
   private cardResponders: Map<string, { body: PanResponderInstance }> =
     new Map();
   private pendingInputKind: "mouse" | "touch" = "mouse";
@@ -433,6 +444,7 @@ export class KanbanDragController {
   unregisterCard = (laneId: string, taskId: string) => {
     const key = `${laneId}:${taskId}`;
     this.cardCallbacks.delete(key);
+    this.cardLongPressCallbacks.delete(key);
     this.cardResponders.delete(key);
     this.unregisterCardLayout(laneId, taskId);
 
@@ -581,12 +593,18 @@ export class KanbanDragController {
     taskId: string,
     onPress?: () => void,
     panResponderFactory?: PanResponderFactory,
+    onLongPress?: (point: { x: number; y: number }) => void,
   ): CardDragBinding => {
     const key = `${laneId}:${taskId}`;
     if (onPress) {
       this.cardCallbacks.set(key, onPress);
     } else {
       this.cardCallbacks.delete(key);
+    }
+    if (onLongPress) {
+      this.cardLongPressCallbacks.set(key, onLongPress);
+    } else {
+      this.cardLongPressCallbacks.delete(key);
     }
 
     const factory = panResponderFactory ?? this.panResponderFactory;
@@ -615,7 +633,12 @@ export class KanbanDragController {
       const observeTouch = (event: GestureResponderEvent) => {
         if (!accepts(event) || !isTouch(event) || this.activeSession) return;
         this.handlePointerDown(
-          { taskId, laneId, onPress: this.cardCallbacks.get(key) },
+          {
+            taskId,
+            laneId,
+            onPress: this.cardCallbacks.get(key),
+            onLongPress: this.cardLongPressCallbacks.get(key),
+          },
           { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY },
           "body",
           "touch",
@@ -656,7 +679,12 @@ export class KanbanDragController {
             });
           } else {
             this.handlePointerDown(
-              { taskId, laneId, onPress: this.cardCallbacks.get(key) },
+              {
+                taskId,
+                laneId,
+                onPress: this.cardCallbacks.get(key),
+                onLongPress: this.cardLongPressCallbacks.get(key),
+              },
               { x: gs.x0, y: gs.y0 },
               "body",
               isTouch(event) ? "touch" : "mouse",
@@ -694,8 +722,14 @@ export class KanbanDragController {
               y: event.nativeEvent.pageY,
             });
         },
-        onTouchEnd: () => {
-          if (ownsTouch() && !claimed) return release();
+        onTouchEnd: (event) => {
+          if (ownsTouch() && !claimed) {
+            // A lifted card must not also emit the browser's trailing click,
+            // which would land on whatever opens under the finger.
+            if (observedTouch?.isActivated && event.cancelable !== false)
+              event.preventDefault?.();
+            return release();
+          }
         },
         onTouchCancel: () => {
           if (ownsTouch()) {
@@ -727,7 +761,12 @@ export class KanbanDragController {
   };
 
   handlePointerDown = (
-    context: { taskId: string; laneId: string; onPress?: () => void },
+    context: {
+      taskId: string;
+      laneId: string;
+      onPress?: () => void;
+      onLongPress?: (point: { x: number; y: number }) => void;
+    },
     point: { x: number; y: number },
     source: "handle" | "body" = "body",
     inputKind?: "mouse" | "touch",
@@ -739,6 +778,8 @@ export class KanbanDragController {
     this.clearPendingTimer();
     this.pendingOnPress =
       inputKind === "touch" ? (context.onPress ?? null) : null;
+    this.pendingOnLongPress =
+      inputKind === "touch" ? (context.onLongPress ?? null) : null;
     this.pendingInputKind = inputKind ?? "mouse";
 
     if (source === "handle") {
@@ -806,6 +847,10 @@ export class KanbanDragController {
     if (dist >= 5) {
       this.clearPendingTimer();
     }
+    this.activeSession.maxDistance = Math.max(
+      this.activeSession.maxDistance ?? 0,
+      dist,
+    );
     this.moveGesture(point.x, point.y);
   };
 
@@ -824,6 +869,29 @@ export class KanbanDragController {
     );
     const onPress = this.pendingOnPress;
     this.pendingOnPress = null;
+    const onLongPress = this.pendingOnLongPress;
+    this.pendingOnLongPress = null;
+    const maxDistance = Math.max(this.activeSession.maxDistance ?? 0, dist);
+
+    // Touch screens have no right click: a long press released in place opens
+    // the card menu instead of performing a no-op drop.
+    if (
+      wasActivated &&
+      onLongPress &&
+      this.pendingInputKind === "touch" &&
+      maxDistance < 5
+    ) {
+      this.cancelGesture();
+      if (this.dragLockTimeout) {
+        clearTimeout(this.dragLockTimeout);
+        this.dragLockTimeout = null;
+      }
+      this.dragLock = false;
+      this.feedback = { ...this.feedback, dragLock: false };
+      this.notifyListeners();
+      onLongPress(point);
+      return;
+    }
 
     if (wasActivated) {
       if (this.releaseHandler) {
@@ -842,6 +910,7 @@ export class KanbanDragController {
   handlePointerCancel = () => {
     this.clearPendingTimer();
     this.pendingOnPress = null;
+    this.pendingOnLongPress = null;
     if (this.cancelHandler) {
       this.cancelHandler();
     } else {

@@ -419,7 +419,9 @@ function createCardStyles(theme: PluginTheme, compact: boolean) {
       ...Platform.select({
         web: {
           outlineWidth: 0,
-        },
+          // iOS Safari: no callout/magnifier during the long press that lifts a card.
+          WebkitTouchCallout: "none",
+        } as object,
       }),
     },
     cardDraggingHidden: {

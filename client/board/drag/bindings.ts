@@ -4,7 +4,7 @@ import {
   useEffect,
   useLayoutEffect,
 } from "react";
-import { Animated, type ViewStyle } from "react-native";
+import { Animated, Platform, type ViewStyle } from "react-native";
 import {
   KanbanDragController,
   type ContainerRefTarget,
@@ -33,6 +33,21 @@ export interface UseKanbanDragReturn {
   readonly overlay: OverlayDragBinding;
   readonly bindLane: (laneId: string) => LaneDragBinding;
   readonly isDragLocked: () => boolean;
+  /** True while a card is lifted; scroll containers disable scrolling. */
+  readonly isDragActive: boolean;
+}
+
+interface TouchMoveTarget {
+  addEventListener(
+    type: "touchmove",
+    listener: (event: { cancelable?: boolean; preventDefault(): void }) => void,
+    options: { passive: false; capture: true },
+  ): void;
+  removeEventListener(
+    type: "touchmove",
+    listener: (event: { cancelable?: boolean; preventDefault(): void }) => void,
+    options: { capture: true },
+  ): void;
 }
 
 export function useKanbanDrag(
@@ -78,6 +93,23 @@ export function useKanbanDrag(
       controller.teardown();
     };
   }, [controller]);
+
+  // Mobile browsers keep panning the page under a lifted card: React registers
+  // touchmove as passive, so only a native non-passive listener can stop it.
+  useEffect(() => {
+    if (!slotState.isDragging || Platform.OS !== "web") return;
+    const target = (globalThis as { document?: TouchMoveTarget }).document;
+    if (!target?.addEventListener) return;
+    const block = (event: { cancelable?: boolean; preventDefault(): void }) => {
+      if (event.cancelable !== false) event.preventDefault();
+    };
+    target.addEventListener("touchmove", block, {
+      passive: false,
+      capture: true,
+    });
+    return () =>
+      target.removeEventListener("touchmove", block, { capture: true });
+  }, [slotState.isDragging]);
 
   // Smooth edge auto-scroll when dragging near viewport boundaries
   useEffect(() => {
@@ -164,6 +196,7 @@ export function useKanbanDrag(
 
     return {
       isHovered,
+      isDragActive: slotState.isDragging || droppingState !== null,
       targetIndex,
       isTaskDragging,
       draggedCardHeight: slotState.draggedCardHeight,
@@ -172,7 +205,9 @@ export function useKanbanDrag(
         taskId: string,
         onSelectTask?: () => void,
         factory?: PanResponderFactory,
-      ) => controller.bindCard(laneId, taskId, onSelectTask, factory),
+        onLongPress?: (point: { x: number; y: number }) => void,
+      ) =>
+        controller.bindCard(laneId, taskId, onSelectTask, factory, onLongPress),
       registerLaneLayout: (layout: Rect) =>
         controller.registerLaneLayout(laneId, layout),
       registerCardsViewport: (layout: Rect) =>
@@ -194,6 +229,7 @@ export function useKanbanDrag(
     overlay: { [overlayController]: controller },
     bindLane,
     isDragLocked,
+    isDragActive: slotState.isDragging || droppingState !== null,
   };
 }
 

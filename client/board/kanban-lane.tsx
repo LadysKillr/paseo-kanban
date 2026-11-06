@@ -1,5 +1,12 @@
 import { useMemo, useLayoutEffect, useRef, Fragment, memo } from "react";
-import { View, Text, ScrollView, StyleSheet, PanResponder } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  PanResponder,
+  Platform,
+} from "react-native";
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import type { KanbanLane, KanbanTask } from "../../shared/kanban";
 import { KanbanCard, KanbanDropSpacer } from "./kanban-card";
@@ -44,6 +51,7 @@ function KanbanLaneViewInner({
   const { t } = useI18n();
   const {
     isHovered,
+    isDragActive,
     targetIndex,
     isTaskDragging,
     draggedCardHeight,
@@ -178,6 +186,7 @@ function KanbanLaneViewInner({
       {/* Cards Viewport */}
       <ScrollView
         style={styles.cardsScroll}
+        scrollEnabled={!isDragActive}
         showsVerticalScrollIndicator={false}
         onLayout={(e) => registerCardsViewport(e.nativeEvent.layout)}
         onScroll={(e) => {
@@ -207,6 +216,10 @@ function KanbanLaneViewInner({
                   task.id,
                   () => onSelectTask(task),
                   PanResponder,
+                  // The card menu is web-only; touch has no right click.
+                  Platform.OS === "web" && onContextMenu
+                    ? (point) => onContextMenu(task.id, point)
+                    : undefined,
                 )}
                 slideAnimation={displacedTasksRef.current.get(task.id)}
                 onSetCompleted={onSetCompleted}

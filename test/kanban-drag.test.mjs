@@ -339,3 +339,66 @@ test("卡片边界迟滞区防抖、横纵滚动动态更新命中槽位并在�
   await gapController.reportDropComplete(drop.operationId);
   assert.deepEqual(requests, []);
 });
+
+function touchBody(renderer, title) {
+  return card(renderer, title)
+    .findAllByType("View")
+    .find((node) => node.props.onPanResponderGrant);
+}
+
+const touchAt = (x, y) => ({
+  nativeEvent: { pointerType: "touch", pageX: x, pageY: y, touches: [{}] },
+  preventDefault() {},
+  stopPropagation() {},
+});
+
+test("触屏：长按抬起卡片时锁定滚动，原地松开打开卡片菜单且不写入", async (t) => {
+  const { host, renderer } = await setup(t);
+  const scrolls = () =>
+    renderer.root
+      .findAllByType("ScrollView")
+      .map((node) => node.props.scrollEnabled);
+  assert.ok(scrolls().every((enabled) => enabled !== false));
+
+  const body = touchBody(renderer, "Task A");
+  await act(async () => body.props.onTouchStart(touchAt(20, 70)));
+  await act(async () => t.mock.timers.tick(250));
+  assert.deepEqual(
+    scrolls().filter((enabled) => enabled === false).length,
+    scrolls().length,
+    "every scroll container is locked while a card is lifted",
+  );
+
+  let prevented = false;
+  await act(async () =>
+    body.props.onTouchEnd({
+      ...touchAt(20, 70),
+      preventDefault: () => (prevented = true),
+    }),
+  );
+  await act(async () => t.mock.timers.tick(100));
+  assert.ok(prevented, "trailing click is suppressed");
+  assert.ok(scrolls().every((enabled) => enabled !== false));
+  assert.equal(
+    renderer.root.findAllByProps({ accessibilityRole: "menu" }).length,
+    1,
+    "long press opens the task menu",
+  );
+  assert.deepEqual(laneTitles(renderer, "Todo"), ["Mark Task A complete"]);
+  assert.equal(host.board.tasks.find((task) => task.id === "a").laneId, "todo");
+});
+
+test("触屏：长按后移动仍是拖拽，不打开菜单", async (t) => {
+  const { renderer } = await setup(t);
+  const body = touchBody(renderer, "Task A");
+  await act(async () => body.props.onTouchStart(touchAt(20, 70)));
+  await act(async () => t.mock.timers.tick(250));
+  await act(async () => body.props.onTouchMove(touchAt(60, 90)));
+  await act(async () => body.props.onTouchMove(touchAt(20, 70)));
+  await act(async () => body.props.onTouchEnd(touchAt(20, 70)));
+  await act(async () => t.mock.timers.tick(500));
+  assert.equal(
+    renderer.root.findAllByProps({ accessibilityRole: "menu" }).length,
+    0,
+  );
+});

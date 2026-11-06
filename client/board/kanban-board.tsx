@@ -586,6 +586,7 @@ function KanbanBoardContent(props: KanbanBoardProps) {
         <ScrollView
           ref={drag.container.bindRef}
           horizontal
+          scrollEnabled={!drag.isDragActive}
           style={styles.lanesContainer}
           contentContainerStyle={styles.lanesContent}
           onLayout={(e) => drag.container.onLayout(e.nativeEvent.layout)}
