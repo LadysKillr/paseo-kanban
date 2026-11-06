@@ -135,6 +135,7 @@ test("Dialog 基础行为：对话框契约、通用关闭、canClose 防护与�
     "../../platform/web": {
       useProjectFilterLayout: () => {},
       useDialogInputFocus: () => "dialog-focus-id",
+      useNativeKeyboardInset: () => 0,
       WebDialogPortal: ({ children, ...props }) =>
         React.createElement("WebDialogPortal", props, children),
     },
@@ -199,6 +200,7 @@ test("ConfirmDialog 基础行为：确认、取消、加载防重与错误提示
       "../../platform/web": {
         useProjectFilterLayout: () => {},
         useDialogInputFocus: () => "confirm-focus-id",
+        useNativeKeyboardInset: () => 0,
         WebDialogPortal: ({ children, ...props }) =>
           React.createElement("WebDialogPortal", props, children),
       },
