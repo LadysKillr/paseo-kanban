@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { isSelect } from "./react-host-env.mjs";
 import {
   React,
   TestRenderer,
@@ -59,7 +60,7 @@ export async function press(root, label) {
 }
 
 export async function chooseProject(root, label) {
-  const select = root.findAllByType("Select")[0];
+  const select = root.findAll(isSelect)[0];
   assert.ok(select && !select.props.disabled, "project select is available");
   const option = select.props.options.find((item) => item.label === label);
   assert.ok(option, `project option ${label} exists`);

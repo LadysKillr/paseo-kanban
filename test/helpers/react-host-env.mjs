@@ -193,3 +193,8 @@ export function loadClientComponent(file, componentName, moduleOverrides = {}) {
   const exports = loadClientModule(file, moduleOverrides);
   return componentName ? exports[componentName] : exports;
 }
+
+/** Matches the kanban Select contract marker and the host settings Select mock. */
+export function isSelect(node) {
+  return node.type === "Select" || node.type?.displayName === "SelectMarker";
+}

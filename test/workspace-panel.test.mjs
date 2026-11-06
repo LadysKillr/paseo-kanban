@@ -1,3 +1,4 @@
+import { isSelect } from "./helpers/react-host-env.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { act } from "./helpers/react-host-env.mjs";
@@ -153,7 +154,7 @@ test("关联项目缺失时卡片与详情回退显示原 ID（不混入无关�
   });
 
   const renderer = await mount(t, host, "workspace-board");
-  const boardFilter = renderer.root.findAllByType("Select")[0];
+  const boardFilter = renderer.root.findAll(isSelect)[0];
   assert.deepEqual(
     boardFilter.props.options.slice(2).map((opt) => opt.label),
     ["Alpha", "missing-board-project", "Zeta"],
@@ -179,7 +180,7 @@ test("关联项目缺失时卡片与详情回退显示原 ID（不混入无关�
   );
   await press(renderer.root, "Edit details");
   const modal = findDialog(renderer.root);
-  const projectSelect = modal.findByType("Select");
+  const projectSelect = modal.find(isSelect);
   assert.equal(projectSelect.props.value, "missing-task-project");
   const modalOptionValues = projectSelect.props.options.map((opt) => opt.value);
   assert.ok(modalOptionValues.includes("missing-task-project"));

@@ -1,3 +1,4 @@
+import { isSelect } from "./helpers/react-host-env.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { act, loadClientModule } from "./helpers/react-host-env.mjs";
@@ -170,7 +171,7 @@ function fixture({
 const modal = (renderer) => findDialog(renderer.root);
 const select = (renderer, label) =>
   modal(renderer)
-    .findAllByType("Select")
+    .findAll(isSelect)
     .find((n) => n.props.label === label);
 async function choose(renderer, label, value) {
   const control = select(renderer, label);
@@ -313,7 +314,7 @@ test("手动任务切换项目仅在发送时持久化，GitHub 导入任务锁�
   await press(emptyView.root, "Send to Agent");
   assert.ok(
     modal(emptyView)
-      .findAllByType("Select")
+      .findAll(isSelect)
       .every((n) => n.props.disabled),
   );
 });

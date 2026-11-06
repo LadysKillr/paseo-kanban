@@ -1,3 +1,4 @@
+import { isSelect } from "./helpers/react-host-env.mjs";
 import { findDialog, findDialogs } from "./helpers/kanban-host.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -58,7 +59,7 @@ async function click(root, label) {
 }
 async function choose(renderer, label, value) {
   const select = modal(renderer)
-    .findAllByType("Select")
+    .findAll(isSelect)
     .find((n) => n.props.label === label);
   assert.ok(select, `selector ${label} exists`);
   assert.ok(
@@ -101,7 +102,7 @@ test("全部视图需显式选择项目才拉取仓库，批量导入生成来�
     },
     null,
   );
-  assert.equal(modal(renderer).findAllByType("Select")[0].props.value, "");
+  assert.equal(modal(renderer).findAll(isSelect)[0].props.value, "");
   assert.equal(reads, 0);
   await press(modal(renderer), "Cancel");
 

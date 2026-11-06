@@ -88,9 +88,15 @@ interface SelectInteractionState {
   hovered?: boolean;
 }
 
-const SelectMarker = "Select" as unknown as React.ComponentType<
-  Record<string, unknown>
->;
+/**
+ * Test hook exposing the Select contract to the test renderer. It must render
+ * nothing: a host-component string such as "Select" has no native view config
+ * and crashes the whole plugin on iOS/Android.
+ */
+export function SelectMarker(_props: Record<string, unknown>): null {
+  return null;
+}
+SelectMarker.displayName = "SelectMarker";
 
 export function Select({
   label,
